@@ -1,0 +1,5 @@
+numpy==1.15.0
+opencv-python==4.0.0.21
+pytorch-ssim==0.1
+tensorflow==1.13.0rc2
+torch==1.1.0a0+7536887
