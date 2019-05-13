@@ -4,28 +4,34 @@ import argparse
 from PIL import Image
 from prediction import *
 from circler import *
+import tensorflow as tf
+import os
+from datetime import datetime
 
-# Instantiate the parser
-parser = argparse.ArgumentParser()
-parser.add_argument("--v", required=True, type=str,
-    help="name of the user")
-parser.add_argument("--o", required=True, type=str,
-    help="name of the user")
+sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 
-# Parse args
-args = parser.parse_args()
+print("\nThis are your available webcams:")
+os.system("ls -ltrh /dev/video*")
+
+webcam = input("\nPlease choose the device number you want to use (0 / 1): ")
+
+createFile = input("Do you wish to save a log file of the results? (y / n)): ")
+
+if createFile == 'y':
+    fileName = input('Please write the file name: ')
 
 # OpenCV webcam vars
 eye_cascade = cv2.CascadeClassifier('./haar/haarcascade_eye_tree_eyeglasses.xml')
-filepath = './videos/' + args.v
 
-# Read in video
-outdir = './out/' + args.o + '/'
-imgdir = 'image/'
-predir = 'pred/'
+# Open webcam
+cap = cv2.VideoCapture(int(webcam))
 
-# Read video
-cap = cv2.VideoCapture(filepath + '.avi')
+# Set the width and height of the frame
+cap.set(3,1280) # Width
+cap.set(4,720) # Height
+
+frame_index = 0
+
 success,image = cap.read()
 
 # Vars
@@ -38,7 +44,6 @@ brighter = 100
 timestamps = []
 log = []
 
-
 # shapes
 img_y, img_x = image.shape[0:2]
 label_offset = 15
@@ -46,6 +51,8 @@ vizbox = (512,256)
 vizbox_x = [(img_x - vizbox[0], img_x - vizbox[1]),
             (img_x - vizbox[1], img_x)]
 
+time_list = []
+ratios_list = []
 
 while success:
     # read image
@@ -53,6 +60,7 @@ while success:
 
     # timestamp from video
     timestamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
+    #print(timestamps)
 
     # Detect eyes in the image
     eyes = eye_cascade.detectMultiScale(gray, 1.1, 5)
@@ -92,11 +100,6 @@ while success:
 
             # # save segment
             seg = np.array(Image.fromarray(seg).convert("RGB"))
-            # cv2.imwrite(outdir + predir + "{}_{}_{}.png"
-            #     .format(args.o,int(timestamps[count]),zoomlevel), seg)
-
-            # # Create red layer
-            #seg = colorise(seg,rgbcode)
 
             # Overlay
             background = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
@@ -109,8 +112,13 @@ while success:
             background[0:rows, 0:0+cols] = overlay
 
             if circle_params is not None:
-                radius_i, center_i, radius_p, center_p = circle_params
-                ratios.append(radius_i / radius_p)
+                ratio, radius_i, center_i, radius_p, center_p = circle_params
+
+                ratios.append(ratio)
+
+                now = datetime.now()
+                time_list.append(str(now))
+                ratios_list.append(ratio)
 
                 # Draw circles
                 background = cv2.circle(background, center_i, radius_i, (255, 0, 0), 2)
@@ -129,7 +137,7 @@ while success:
                 (img_x, img_y), (0,0,0), 2)
 
                 if circle_params is not None:
-                    label = "avg. ratio: " + str(round(sum(ratios)/len(ratios),3))
+                    label = "avg. ratio: " + str(round(sum(ratios)/len(ratios),3)+1e-6)
                     frame = "frame: " + str(count)
                     lab_x = (img_x-vizbox[0]) + label_offset
                     lab_y = (img_y-vizbox[1]) + label_offset + 5
@@ -138,13 +146,29 @@ while success:
                     cv2.putText(image, frame, (lab_x, lab_y + 15),
     			            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
 
-    print(outdir + imgdir + "{}_{}_{}.png"
-    .format(args.o,str(int(timestamps[count])).zfill(4),zoomlevel))
-
-    cv2.imwrite(outdir + imgdir + "{}_{}_{}.png"
-    .format(args.o,str(int(timestamps[count])).zfill(4),zoomlevel), image)     # save frame as JPEG file
     count += 1
+
+    # Display the images
+    cv2.imshow('image', image)
+    
+    # Press Q on keyboard to exit 
+    if cv2.waitKey(1) & 0xFF== ord ('q'):
+        break
 
 
     #count += 1
     success,image = cap.read()
+
+def genFile(createFile, time_list, ratios_list, fileName = ""):
+    
+    if createFile == 'y':
+        newFile = open(fileName + ".txt", 'w')
+        newFile.write("DateTime,Ratio" + "\n")
+        
+        for i in range(len(ratios_list)):
+            newFile.write(str(time_list[i]) + ',' + str(round(ratios_list[i], 3))+"\n")
+            
+    else:
+        return
+
+logFile = genFile(createFile, time_list, ratios_list, fileName)

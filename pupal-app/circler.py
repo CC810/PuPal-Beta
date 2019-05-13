@@ -19,7 +19,12 @@ def circler(im):
         center_p = (int(x_p), int(y_p))
         radius_p = int(radius_pupil)
 
-        return radius_i, center_i, radius_p, center_p
+        # ratio
+        ratio = round((radius_pupil / radius_iris), 4)
+        if ratio > 0.2 and ratio < 0.8:
+            return ratio, radius_i, center_i, radius_p, center_p
+        else:
+            pass
 
     else:
         pass
